@@ -4,12 +4,16 @@
 #include <cuda.h>
 #include <nvrtc.h>
 
+#define NUM 100000
+#define xstr(X) str(X)
+#define str(X) #X
+
 const char *program = "// Vector addition\n"
 "extern \"C\"\n"
 "__global__ void vecSum(int *a, int *b, int *c) {\n"
-"	int tid = blockIdx.x;\n"
-"	if (tid < 100)\n"
-"		c[tid] = a[tid] + b[tid];\n"
+"	int i = blockIdx.x * blockDim.x + threadIdx.x;\n"
+"	if (i < " xstr(NUM) ")\n"
+"		c[i] = a[i] + b[i];\n"
 "}\n";
 
 void errorCheck(CUresult res, char *message) {
@@ -37,20 +41,16 @@ void errorCheck(CUresult res, char *message) {
 }
 
 int main(void) {
-	int numDevices;
-	CUdevice dev;
-	CUcontext ctx;
-	nvrtcResult res;
-	nvrtcProgram pr1;
-
 	errorCheck(cuInit(0), "Error while initializing: %d\n");
-	errorCheck(cuDeviceGetCount(&numDevices), "Error while getting devices count: %d\n");
 
+	int numDevices;
+	errorCheck(cuDeviceGetCount(&numDevices), "Error while getting devices count: %d\n");
 	if (numDevices == 0) {
 		printf("Error: no CUDA devices available!");
 		exit(0);
 	}
 
+	CUdevice dev;
 	errorCheck(cuDeviceGet(&dev, 0), "Error while getting device 0: %d\n");
 
 	// Write device name
@@ -58,9 +58,25 @@ int main(void) {
 	errorCheck(cuDeviceGetName(name, 100, dev), "Error while retrieving device name: %d\n");
 	printf("Using device %s\n", name);
 
+	int mbx, mby, mbz, mgx, mgy, mgz;
+	cuDeviceGetAttribute(&mbx, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X, dev);
+	cuDeviceGetAttribute(&mby, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y, dev);
+	cuDeviceGetAttribute(&mbz, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z, dev);
+	cuDeviceGetAttribute(&mgx, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X, dev);
+	cuDeviceGetAttribute(&mgy, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Y, dev);
+	cuDeviceGetAttribute(&mgz, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Z, dev);
+	printf("Max block dim: %d %d %d\n", mbx, mby, mbz);
+	printf("Max grid dim: %d %d %d\n", mgx, mgy, mgz);
+
+	int tpb;
+	cuDeviceGetAttribute(&tpb, CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK, dev);
+	printf("Max threads per block: %d\n", tpb);
+
+	CUcontext ctx;
 	errorCheck(cuCtxCreate(&ctx, 0, dev), "Error while creating context: %d\n");
 
-	res = nvrtcCreateProgram(&pr1, program, "vecSum", 0, 0, 0);
+	nvrtcProgram pr1;
+	nvrtcResult res = nvrtcCreateProgram(&pr1, program, "vecSum", 0, 0, 0);
 	if (res != NVRTC_SUCCESS) {
 		printf("Error while creating program: %d\n", res);
 		exit(1);
@@ -82,8 +98,9 @@ int main(void) {
 	// Retrieve PTX
 	size_t ptxLen;
 	nvrtcGetPTXSize(pr1, &ptxLen);
-	char *ptx = (char*)malloc(ptxLen);
+	char *ptx = (char*)malloc(sizeof(char) * ptxLen);
 	nvrtcGetPTX(pr1, ptx);
+	nvrtcDestroyProgram(&pr1);
 
 	// Create module
 	CUmodule mod;
@@ -97,8 +114,9 @@ int main(void) {
 	//errorCheck(cuStreamCreate(&stream, CU_STREAM_DEFAULT), "Error while creating stream: %d\n");
 
 	// Setup host memory
-	int ha[100], hb[100], hc[100];
-	for (int i = 0; i < 100; i++) {
+	int ha[NUM], hb[NUM], hc[NUM];
+	size_t size = NUM * sizeof(int);
+	for (int i = 0; i < NUM; i++) {
 		ha[i] = i+1;
 		hb[i] = 10000-i*i;
 		hc[i] = -1;
@@ -106,23 +124,33 @@ int main(void) {
 
 	// Setup device memory
 	CUdeviceptr da, db, dc;
-	errorCheck(cuMemAlloc(&da, sizeof(int) * 100), "Error while allocating da: %d\n");
-	errorCheck(cuMemAlloc(&db, sizeof(int) * 100), "Error while allocating db: %d\n");
-	errorCheck(cuMemAlloc(&dc, sizeof(int) * 100), "Error while allocating dc: %d\n");
+	errorCheck(cuMemAlloc(&da, size), "Error while allocating da: %d\n");
+	errorCheck(cuMemAlloc(&db, size), "Error while allocating db: %d\n");
+	errorCheck(cuMemAlloc(&dc, size), "Error while allocating dc: %d\n");
+
+	errorCheck(cuCtxSynchronize(), "Error while sync: %d\n");
 
 	// Copy from host to device
-	errorCheck(cuMemcpyHtoD(da, ha, sizeof(int) * 100), "Error while copying ha->da: %d\n");
-	errorCheck(cuMemcpyHtoD(db, hb, sizeof(int) * 100), "Error while copying hb->db: %d\n");
+	errorCheck(cuMemcpyHtoD(da, ha, size), "Error while copying ha->da: %d\n");
+	errorCheck(cuMemcpyHtoD(db, hb, size), "Error while copying hb->db: %d\n");
 
-	void *args[3] = {&da, &db, &dc};
+	errorCheck(cuCtxSynchronize(), "Error while sync: %d\n");
+
+	void *args[] = {(void*)&da, (void*)&db, (void*)&dc};
+	int bpg = (NUM + tpb - 1) / tpb; // Blocks per grid
 	errorCheck(cuLaunchKernel(func,
-				/* grid xyz */ 100, 1, 1,
-				/* block xyz */ 1, 1, 1,
+				/* grid xyz */ bpg, 1, 1,
+				/* block xyz */ tpb, 1, 1,
 				/* shmem */ 0,
 				/* stream */ stream,
-				args, 0), "Error while launching kernel: %d\n");
+				&args[0], 0), "Error while launching kernel: %d\n");
+	errorCheck(cuCtxSynchronize(), "Error while sync: %d\n");
 
-	errorCheck(cuMemcpyDtoH(hc, dc, sizeof(int) * 100), "Error while copying back: %d\n");
+	errorCheck(cuMemcpyDtoH(hc, dc, size), "Error while copying back: %d\n");
+
+	cuMemFree(da);
+	cuMemFree(db);
+	cuMemFree(dc);
 
 	printf("Computation done!\n");
 	for (int i = 0; i < 100; i++) {

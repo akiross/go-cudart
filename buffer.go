@@ -1,4 +1,4 @@
-package main
+package gocudart
 
 /*
 #cgo CFLAGS: -I/usr/local/cuda/include

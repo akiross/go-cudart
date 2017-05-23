@@ -1,4 +1,4 @@
-package main
+package gocudart
 
 /*
 #cgo CFLAGS: -I/usr/local/cuda/include
@@ -10,11 +10,11 @@ import "C"
 import "unsafe"
 
 type Module struct {
-	id C.CUmodule
+	Id C.CUmodule
 }
 
 type Function struct {
-	id C.CUfunction
+	Id C.CUfunction
 }
 
 func CreateModule() *Module {
@@ -22,7 +22,7 @@ func CreateModule() *Module {
 }
 
 func (mod *Module) LoadData(prog *Program) {
-	res := C.cuModuleLoadData(&mod.id, unsafe.Pointer(&prog.PTX[0]))
+	res := C.cuModuleLoadData(&mod.Id, unsafe.Pointer(&prog.PTX[0]))
 	if res != C.CUDA_SUCCESS {
 		panic(res)
 	}
@@ -32,7 +32,7 @@ func (mod *Module) GetFunction(name string) *Function {
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 	var fun Function
-	res := C.cuModuleGetFunction(&fun.id, mod.id, cname)
+	res := C.cuModuleGetFunction(&fun.Id, mod.Id, cname)
 	if res != C.CUDA_SUCCESS {
 		panic(res)
 	}

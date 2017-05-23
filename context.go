@@ -1,4 +1,4 @@
-package main
+package gocudart
 
 // #cgo CFLAGS: -I/usr/local/cuda/include
 // #cgo LDFLAGS: -L/usr/local/cuda/lib64 -L/usr/lib64/nvidia-bumblebee -lcuda -lnvrtc
