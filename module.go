@@ -5,6 +5,8 @@ package gocudart
 #cgo LDFLAGS: -L/usr/local/cuda/lib64 -L/usr/lib64/nvidia-bumblebee -lcuda -lnvrtc
 #include <cuda.h>
 #include <nvrtc.h>
+void **allocArgs(int n) { return (void**)malloc(sizeof(void*) * n); }
+void setArg(void **args, int i, void *d) { args[i] = d; }
 */
 import "C"
 import "unsafe"
@@ -15,6 +17,26 @@ type Module struct {
 
 type Function struct {
 	Id C.CUfunction
+}
+
+// Passing scalars is not supported yet: create a buffer and put a single element in it
+func (fun *Function) Launch1D(gx, bx, shmem int, buffs ...*Buffer) {
+	// Prepare the array of buffers
+	args := C.allocArgs(C.int(len(buffs)))
+	for i, b := range buffs {
+		C.setArg(args, C.int(i), unsafe.Pointer(&b.Id))
+	}
+	res := C.cuLaunchKernel(fun.Id,
+		C.uint(gx), 1, 1,
+		C.uint(bx), 1, 1,
+		C.uint(shmem),
+		nil,
+		args,
+		nil)
+
+	if res != C.CUDA_SUCCESS {
+		panic(res)
+	}
 }
 
 func CreateModule() *Module {
