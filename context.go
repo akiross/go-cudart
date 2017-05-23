@@ -10,6 +10,7 @@ type Context struct {
 	id C.CUcontext
 }
 
+// WARNING: The created context is bound to a CPU thread, therefore use runtime.LockOSThread()
 func Create(dev *Device, flags uint) *Context {
 	var ctx Context
 	res := C.cuCtxCreate(&ctx.id, C.uint(flags), dev.id)
