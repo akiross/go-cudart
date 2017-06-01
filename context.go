@@ -15,7 +15,7 @@ func Create(dev *Device, flags uint) *Context {
 	var ctx Context
 	res := C.cuCtxCreate(&ctx.id, C.uint(flags), dev.id)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	return &ctx
 }
@@ -23,7 +23,7 @@ func Create(dev *Device, flags uint) *Context {
 func (ctx *Context) Destroy() {
 	res := C.cuCtxDestroy(ctx.id)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 }
 
@@ -31,7 +31,7 @@ func (ctx *Context) GetApiVersion() uint {
 	var ver C.uint
 	res := C.cuCtxGetApiVersion(ctx.id, &ver)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	return uint(ver)
 }
@@ -39,14 +39,14 @@ func (ctx *Context) GetApiVersion() uint {
 func (ctx *Context) Synchronize() {
 	res := C.cuCtxSynchronize()
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 }
 
 func (ctx *Context) PushCurrent() {
 	res := C.cuCtxPushCurrent(ctx.id)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 }
 
@@ -54,7 +54,7 @@ func PopCurrent() *Context {
 	var ctx Context
 	res := C.cuCtxPopCurrent(&ctx.id)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	return &ctx
 }

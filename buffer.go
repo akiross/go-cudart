@@ -17,7 +17,7 @@ func NewBuffer(size int) *Buffer {
 	var buf Buffer
 	res := C.cuMemAlloc(&buf.Id, C.size_t(size))
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	buf.num = size
 	return &buf
@@ -26,13 +26,13 @@ func NewBuffer(size int) *Buffer {
 func (buf *Buffer) FromHost(source unsafe.Pointer) {
 	res := C.cuMemcpyHtoD(buf.Id, source, C.size_t(buf.num))
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 }
 
 func (buf *Buffer) FromDevice(dest unsafe.Pointer) {
 	res := C.cuMemcpyDtoH(dest, buf.Id, C.size_t(buf.num))
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 }

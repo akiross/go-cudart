@@ -17,7 +17,7 @@ func (dev *Device) GetAttribute(attrib C.CUdevice_attribute) int {
 	var val C.int
 	res := C.cuDeviceGetAttribute(&val, attrib, dev.id)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	return int(val)
 }
@@ -41,7 +41,7 @@ func GetDevicesCount() int {
 	var res C.CUresult
 	res = C.cuDeviceGetCount(&num)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	return int(num)
 }
@@ -50,21 +50,21 @@ func GetDevice(ordinal int) *Device {
 	var dev Device
 	res := C.cuDeviceGet(&dev.id, C.int(ordinal))
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	// Get device name
 	var str = C.malloc(1024)
 	defer C.free(str)
 	res = C.cuDeviceGetName((*C.char)(str), 1024, dev.id)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	dev.Name = C.GoString((*C.char)(str))
 	// Get device total memory
 	var totMem C.size_t
 	res = C.cuDeviceTotalMem(&totMem, dev.id)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	dev.TotalMem = uint(totMem)
 	return &dev

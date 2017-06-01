@@ -35,7 +35,7 @@ func (fun *Function) Launch1D(gx, bx, shmem int, buffs ...*Buffer) {
 		nil)
 
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 }
 
@@ -46,7 +46,7 @@ func CreateModule() *Module {
 func (mod *Module) LoadData(prog *Program) {
 	res := C.cuModuleLoadData(&mod.Id, unsafe.Pointer(&prog.PTX[0]))
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 }
 
@@ -56,7 +56,7 @@ func (mod *Module) GetFunction(name string) *Function {
 	var fun Function
 	res := C.cuModuleGetFunction(&fun.Id, mod.Id, cname)
 	if res != C.CUDA_SUCCESS {
-		panic(res)
+		panic(CudaErrorString(res))
 	}
 	return &fun
 }
@@ -77,7 +77,7 @@ func GetNVRTCVersion() (major, minor int) {
 	var maj, min C.int
 	res := C.nvrtcVersion(&maj, &min)
 	if res != C.NVRTC_SUCCESS {
-		panic(res)
+		panic(NvrtcErrorString(res))
 	}
 	major, minor = int(maj), int(min)
 	return
@@ -110,7 +110,7 @@ func CreateProgram(src Source, headers []Source) *Program {
 	}
 	res := C.nvrtcCreateProgram(&prog.prog, c_src, c_name, numHeads, heads, headNames)
 	if res != C.NVRTC_SUCCESS {
-		panic(res)
+		panic(NvrtcErrorString(res))
 	}
 
 	return &prog
@@ -120,13 +120,13 @@ func (prog *Program) GetLog() string {
 	var size C.size_t
 	res := C.nvrtcGetProgramLogSize(prog.prog, &size)
 	if res != C.NVRTC_SUCCESS {
-		panic(res)
+		panic(NvrtcErrorString(res))
 	}
 	buf := (*C.char)(C.malloc(size))
 	defer C.free(unsafe.Pointer(buf))
 	res = C.nvrtcGetProgramLog(prog.prog, buf)
 	if res != C.NVRTC_SUCCESS {
-		panic(res)
+		panic(NvrtcErrorString(res))
 	}
 	return C.GoString(buf)
 }
@@ -137,14 +137,14 @@ func (prog *Program) Compile(opts []string) {
 		str := C.GoString(C.nvrtcGetErrorString(res))
 		println(str)
 		println(prog.GetLog())
-		panic(res)
+		panic(NvrtcErrorString(res))
 	}
 
 	// Retrieve PTX
 	var size C.size_t
 	res = C.nvrtcGetPTXSize(prog.prog, &size)
 	if res != C.NVRTC_SUCCESS {
-		panic(res)
+		panic(NvrtcErrorString(res))
 	}
 	buf := (*C.char)(C.malloc(size))
 	defer C.free(unsafe.Pointer(buf))
