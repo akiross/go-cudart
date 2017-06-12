@@ -12,6 +12,8 @@ import (
 	"unsafe"
 )
 
+// TODO linked list in CGO that is used inside CUDA kernel
+
 func main() {
 	gocu.Init()
 	fmt.Println("CUDA Driver Version:", gocu.GetVersion())
@@ -55,12 +57,12 @@ __global__ void vecSum(int *a, int *b, int *c, int len) {
 
 	const num = 100000
 
-	//hlen := (*[1]C.int)(C.malloc(C.sizeof_int))
+	hlen := (*[1]C.int)(C.malloc(C.sizeof_int))
 	ha := (*[num]C.int)(C.malloc(C.sizeof_int * num))
 	hb := (*[num]C.int)(C.malloc(C.sizeof_int * num))
 	hc := (*[num]C.int)(C.malloc(C.sizeof_int * num))
 
-	//hlen[0] = num
+	hlen[0] = num
 	for i := 0; i < num; i++ {
 		ha[i] = C.int(i + 1)
 		hb[i] = C.int(10000 - i*i)
@@ -76,7 +78,7 @@ __global__ void vecSum(int *a, int *b, int *c, int len) {
 	db := gocu.NewBuffer(C.sizeof_int * num)
 	dc := gocu.NewBuffer(C.sizeof_int * num)
 
-	dlen.FromInt(num) //Host(unsafe.Pointer(&hlen[0]))
+	dlen.FromHost(unsafe.Pointer(&hlen[0]))
 	da.FromHost(unsafe.Pointer(&ha[0]))
 	db.FromHost(unsafe.Pointer(&hb[0]))
 
