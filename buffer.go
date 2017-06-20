@@ -6,6 +6,7 @@ package gocudart
 #include <cuda.h>
 */
 import "C"
+import "fmt"
 import "unsafe"
 
 type Buffer struct {
@@ -55,7 +56,7 @@ func (buf *Buffer) MemSet32(v uint32, num int) {
 
 func (buf *Buffer) FromHostN(source unsafe.Pointer, size int) {
 	if size > buf.num {
-		panic("Trying to copy from host more bytes than buffer capacity")
+		panic(fmt.Sprintf("Trying to copy from host more bytes (%v) than buffer capacity (%v)", size, buf.num))
 	}
 	res := C.cuMemcpyHtoD(buf.Id, source, C.size_t(size))
 	if res != C.CUDA_SUCCESS {
