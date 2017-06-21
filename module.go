@@ -83,15 +83,15 @@ func GetNVRTCVersion() (major, minor int) {
 	return
 }
 
-func CreateProgram(src Source, headers []Source) *Program {
+func CreateProgram(src Source, headers ...Source) *Program {
 	var prog Program
 
 	c_src, c_name := C.CString(src.Source), C.CString(src.Name)
 	defer C.free(unsafe.Pointer(c_src))
 	defer C.free(unsafe.Pointer(c_name))
 
+	// Convert source strings and their names to array of c-strings
 	var numHeads C.int = C.int(len(headers))
-
 	var heads, headNames **C.char
 	if numHeads == 0 {
 		nullptr := (**C.char)(unsafe.Pointer(uintptr(0)))
@@ -131,8 +131,22 @@ func (prog *Program) GetLog() string {
 	return C.GoString(buf)
 }
 
-func (prog *Program) Compile(opts []string) {
-	res := C.nvrtcCompileProgram(prog.prog, 0, (**C.char)(unsafe.Pointer(uintptr(0))))
+func (prog *Program) Compile(opts ...string) {
+	// Convert list of string to array of c-strings
+	var numOpts = C.int(len(opts))
+	var options **C.char
+	if numOpts == 0 {
+		options = (**C.char)(unsafe.Pointer(uintptr(0)))
+	} else {
+		optarr := make([]*C.char, numOpts)
+		for i := 0; i < int(numOpts); i++ {
+			optarr[i] = C.CString(opts[i])
+			defer C.free(unsafe.Pointer(optarr[i]))
+		}
+		options = (**C.char)(unsafe.Pointer(&optarr[0]))
+	}
+	// Compile and get result
+	res := C.nvrtcCompileProgram(prog.prog, numOpts, options)
 	if res != C.NVRTC_SUCCESS {
 		str := C.GoString(C.nvrtcGetErrorString(res))
 		println(str)

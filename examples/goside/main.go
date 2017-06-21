@@ -48,8 +48,8 @@ __global__ void vecSum(int *a, int *b, int *c, int len) {
 	int tid = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tid < len)
 		c[tid] = a[tid] + b[tid];
-}`, "vector_add"}, nil)
-	pr1.Compile(nil)
+}`, "vector_add"})
+	pr1.Compile()
 
 	fmt.Println("Program PTX is", len(pr1.PTX), "bytes long")
 
@@ -76,7 +76,7 @@ __global__ void vecSum(int *a, int *b, int *c, int len) {
 	db := gocu.NewBuffer(C.sizeof_int * num)
 	dc := gocu.NewBuffer(C.sizeof_int * num)
 
-	dlen.FromInt(num) //Host(unsafe.Pointer(&hlen[0]))
+	dlen.FromIntC(num) //Host(unsafe.Pointer(&hlen[0]))
 	da.FromHost(unsafe.Pointer(&ha[0]))
 	db.FromHost(unsafe.Pointer(&hb[0]))
 
