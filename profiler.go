@@ -15,7 +15,7 @@ func StartProfiler() {
 	}
 }
 
-func End() {
+func StopProfiler() {
 	res := C.cuProfilerStop()
 	if res != C.CUDA_SUCCESS {
 		panic(CudaErrorString(res))
