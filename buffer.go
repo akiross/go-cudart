@@ -70,7 +70,7 @@ func (buf *Buffer) FromHost(source unsafe.Pointer) {
 
 func (buf *Buffer) FromDeviceN(dest unsafe.Pointer, size int) {
 	if size > buf.num {
-		panic("Trying to copy from device more bytes than buffer capacity")
+		panic(fmt.Sprintf("Trying to copy from device more bytes (%v) than buffer capacity (%v)", size, buf.num))
 	}
 	res := C.cuMemcpyDtoH(dest, buf.Id, C.size_t(size))
 	if res != C.CUDA_SUCCESS {
@@ -82,13 +82,38 @@ func (buf *Buffer) FromDevice(dest unsafe.Pointer) {
 	buf.FromDeviceN(dest, buf.num)
 }
 
-func AllocManaged(size int) unsafe.Pointer {
-	var buf uintptr
-	res := C.cuMemAllocManaged((*C.CUdeviceptr)(unsafe.Pointer(&buf)), C.size_t(size), C.CU_MEM_ATTACH_GLOBAL)
+// Allocate raw memory
+func AllocManaged(size int) (*Buffer, unsafe.Pointer) {
+	var buf Buffer
+	// FIXME shall the buffer capacity be set?
+	// Being unset, it is not possible to copy memory around using FromHost/FromDevice methods
+
+	res := C.cuMemAllocManaged(&buf.Id, C.size_t(size*4), C.CU_MEM_ATTACH_GLOBAL)
+	//var buf uintptr
+	//res := C.cuMemAllocManaged((*C.CUdeviceptr)(unsafe.Pointer(&buf)), C.size_t(size*4), C.CU_MEM_ATTACH_GLOBAL)
 	if res != C.CUDA_SUCCESS {
 		panic(CudaErrorString(res))
 	}
-	return unsafe.Pointer(buf)
+	return &buf, unsafe.Pointer(uintptr(buf.Id))
+}
+
+// Allocates an array of float32 using unified memory
+func AllocManagedFloat32(size int) (*Buffer, []float32) {
+	buf, ptr := AllocManaged(size * 4)
+	data := (*[2 << 30]float32)(ptr)
+	return buf, data[0:size]
+}
+
+func AllocManagedFloat64(size int) (*Buffer, []float64) {
+	buf, ptr := AllocManaged(size * 8)
+	data := (*[2 << 30]float64)(ptr)
+	return buf, data[0:size]
+}
+
+func AllocManagedInt32(size int) (*Buffer, []int32) {
+	buf, ptr := AllocManaged(size * 4)
+	data := (*[2 << 30]int32)(ptr)
+	return buf, data[0:size]
 }
 
 // Convenience functions to read/copy single variables
